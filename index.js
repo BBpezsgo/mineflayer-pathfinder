@@ -129,6 +129,16 @@ function inject (bot) {
     bot.removeAllListeners('diggingCompleted', detectDiggingStopped)
   }
 
+  function clearControlStates() {
+    bot.setControlState('forward', false)
+    bot.setControlState('back', false)
+    bot.setControlState('left', false)
+    bot.setControlState('right', false)
+    bot.setControlState('jump', false)
+    bot.setControlState('sprint', false)
+    bot.setControlState('sneak', stateMovements.sneak)
+  }
+
   function resetPath (reason, clearStates = true) {
     if (!stopPathing && path.length > 0) bot.emit('path_reset', reason)
     path = []
@@ -144,7 +154,9 @@ function inject (bot) {
     lockPlaceBlock.release()
     lockUseBlock.release()
     stateMovements.clearCollisionIndex()
-    if (clearStates) bot.clearControlStates()
+    if (clearStates) {
+      clearControlStates()
+    }
     if (stopPathing) return stop()
   }
 
@@ -337,7 +349,7 @@ function inject (bot) {
    * current blocks dimensions.
    */
   function fullStop () {
-    bot.clearControlStates()
+    clearControlStates()
 
     // Force horizontal velocity to 0 (otherwise inertia can move us too far)
     // Kind of cheaty, but the server will not tell the difference
@@ -380,6 +392,7 @@ function inject (bot) {
       return false
     }
     bot.setControlState('back', false)
+    if (stateMovements.sneak) { bot.setControlState('sneak', true) }
     return true
   }
 
@@ -390,9 +403,11 @@ function inject (bot) {
     if (bot.entity.position.distanceSquared(targetPos) > minDistanceSq) {
       bot.lookAt(targetPos)
       bot.setControlState('forward', true)
+      if (stateMovements.sneak) { bot.setControlState('sneak', true) }
       return false
     }
     bot.setControlState('forward', false)
+    if (stateMovements.sneak) { bot.setControlState('sneak', true) }
     return true
   }
 
@@ -434,8 +449,9 @@ function inject (bot) {
 
         if (target.position.distanceSquared(bot.entity.position) > stateGoal.rangeSq) {
           bot.setControlState('forward', true)
+          if (stateMovements.sneak) { bot.setControlState('sneak', true) }
         } else {
-          bot.clearControlStates()
+          clearControlStates()
         }
         return
       }
@@ -565,7 +581,7 @@ function inject (bot) {
             bot.placeBlock(refBlock, new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz))
               .then(function () {
                 // Dont release Sneak if the block placement was not successful
-                bot.setControlState('sneak', false)
+                bot.setControlState('sneak', stateMovements.sneak)
                 if (bot.pathfinder.LOSWhenPlacingBlocks && placingBlock.returnPos) returningPos = placingBlock.returnPos.clone()
               })
               .catch(_ignoreError => {
@@ -636,6 +652,8 @@ function inject (bot) {
       bot.setControlState('forward', false)
       bot.setControlState('sprint', false)
     }
+
+    if (stateMovements.sneak) { bot.setControlState('sneak', true) }
 
     // check for futility
     if (performance.now() - lastNodeTime > 3500) {
