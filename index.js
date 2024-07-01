@@ -12,6 +12,9 @@ const Physics = require('./lib/physics')
 const nbt = require('prismarine-nbt')
 const interactableBlocks = require('./lib/interactable.json')
 
+/**
+ * @param {import('mineflayer').Bot} bot
+ */
 function inject (bot) {
   const waterType = bot.registry.blocksByName.water.id
   const ladderId = bot.registry.blocksByName.ladder.id
