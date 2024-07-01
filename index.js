@@ -37,13 +37,14 @@ function inject (bot) {
   const lockEquipItem = new Lock()
   const lockUseBlock = new Lock()
 
-  bot.pathfinder = {}
-
-  bot.pathfinder.thinkTimeout = 5000 // ms
-  bot.pathfinder.tickTimeout = 40 // ms, amount of thinking per tick (max 50 ms)
-  bot.pathfinder.searchRadius = -1 // in blocks, limits of the search area, -1: don't limit the search
-  bot.pathfinder.enablePathShortcut = false // disabled by default as it can cause bugs in specific configurations
-  bot.pathfinder.LOSWhenPlacingBlocks = true
+  // @ts-ignore
+  bot.pathfinder = {
+    thinkTimeout: 5000, // ms
+    tickTimeout: 40, // ms, amount of thinking per tick (max 50 ms)
+    searchRadius: -1, // in blocks, limits of the search area, -1: don't limit the search
+    enablePathShortcut: false, // disabled by default as it can cause bugs in specific configurations
+    LOSWhenPlacingBlocks: true,
+  }
 
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items()
@@ -113,6 +114,11 @@ function inject (bot) {
     movements: {
       get () {
         return stateMovements
+      }
+    },
+    path: {
+      get () {
+        return path
       }
     }
   })
