@@ -18,9 +18,9 @@ declare module 'mineflayer-pathfinder' {
 		readonly goal: goals.Goal | null;
 		readonly movements: Movements;
 
-		readonly searchRadius?: number;
-		readonly enablePathShortcut?: boolean;
-		readonly LOSWhenPlacingBlocks?: boolean;
+		searchRadius?: number;
+		enablePathShortcut?: boolean;
+		LOSWhenPlacingBlocks?: boolean;
 
 		bestHarvestTool(block: Block): Item | null;
 		getPathTo(
@@ -44,7 +44,7 @@ declare module 'mineflayer-pathfinder' {
 
 		setGoal(goal: goals.Goal | null, dynamic?: boolean): void;
 		setMovements(movements: Movements): void;
-		goto(goal: goals.Goal, callback?: Callback): Promise<void>;
+		goto(goal: goals.Goal, callback?: (error?: Error) => void): Promise<void>;
 		stop(): void;
 
 		isMoving(): boolean;
@@ -216,14 +216,12 @@ declare module 'mineflayer-pathfinder' {
 		hash: string;
 	}
 
-	type Callback = (error?: Error) => void;
-
 	interface PathBase {
 		cost: number;
 		time: number;
 		visitedNodes: number;
 		generatedNodes: number;
-		path: Move[];
+		path: Array<Move>;
 	}
 
 	export interface ComputedPath extends PathBase {

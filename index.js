@@ -1,7 +1,7 @@
 const { performance } = require('perf_hooks')
 
 const AStar = require('./lib/astar')
-const Move = require('./lib/move')
+const { Move } = require('./lib/move')
 const Movements = require('./lib/movements')
 const gotoUtil = require('./lib/goto')
 const Lock = require('./lib/lock')
