@@ -1,5 +1,4 @@
 import { Bot } from 'mineflayer';
-import { IndexedData } from 'minecraft-data';
 import { Item } from 'prismarine-item';
 import { Vec3 } from 'vec3';
 import { Block } from 'prismarine-block';
@@ -7,6 +6,7 @@ import { Entity } from 'prismarine-entity';
 import { World } from 'prismarine-world'
 import AStar from './lib/astar';
 import * as _Movements from './lib/movements';
+import * as _Move from './lib/move';
 
 declare module 'mineflayer-pathfinder' {
 	export function pathfinder(bot: Bot): void;
@@ -131,8 +131,8 @@ declare module 'mineflayer-pathfinder' {
 		}
 
 		export class GoalCompositeAny<T extends Goal> extends Goal {
-			public constructor(goals: T[] = []);
-			public goals: T[];
+			public constructor(goals: Array<T> = []);
+			public goals: Array<T>;
 			
 			public push(goal: Goal): void;
 			public heuristic(node: Move): number;
@@ -141,8 +141,8 @@ declare module 'mineflayer-pathfinder' {
 		}
 
 		export class GoalCompositeAll<T extends Goal> extends Goal {
-			public constructor(goals: T[] = []);
-			public goals: T[];
+			public constructor(goals: Array<T> = []);
+			public goals: Array<T>;
 
 			public push(goal: Goal): void;
 			public heuristic(node: Move): number;
@@ -206,15 +206,7 @@ declare module 'mineflayer-pathfinder' {
 
 	export class Movements extends _Movements { }
 
-	// this is a class, but its not exported so we use an interface
-	export interface Move extends XYZCoordinates {
-		remainingBlocks: number;
-		cost: number;
-		toBreak: Move[];
-		toPlace: Move[];
-		parkour: boolean;
-		hash: string;
-	}
+	export class Move extends _Move.Move { }
 
 	interface PathBase {
 		cost: number;
@@ -232,15 +224,6 @@ declare module 'mineflayer-pathfinder' {
 		status: 'noPath' | 'timeout' | 'success' | 'partial';
 	}
 
-	export interface XZCoordinates {
-		x: number;
-		z: number;
-	}
-
-	export interface XYZCoordinates extends XZCoordinates {
-		y: number;
-	}
-
 	export interface SafeBlock extends Block {
 		safe: boolean
 		physical: boolean
@@ -255,7 +238,7 @@ declare module 'mineflayer-pathfinder' {
 	export interface GoalPlaceBlockOptions {
 		range: number;
 		LOS: boolean;
-		faces: Vec3[];
+		faces: Array<Vec3>;
 		facing: 'north' | 'east' | 'south' | 'west' | 'up' | 'down';
 	}
 }
