@@ -10,6 +10,7 @@ const Vec3 = require('vec3').Vec3
 
 const Physics = require('./lib/physics')
 const nbt = require('prismarine-nbt')
+    // @ts-ignore
 const interactableBlocks = require('./lib/interactable.json')
 
 /**
@@ -125,7 +126,9 @@ function inject (bot) {
 
   function detectDiggingStopped () {
     digging = false
+    // @ts-ignore
     bot.removeAllListeners('diggingAborted', detectDiggingStopped)
+    // @ts-ignore
     bot.removeAllListeners('diggingCompleted', detectDiggingStopped)
   }
 
@@ -186,6 +189,9 @@ function inject (bot) {
 
   bot.on('physicsTick', monitorMovement)
 
+  /**
+   * @param {Array<Move>} path
+   */
   function postProcessPath (path) {
     for (let i = 0; i < path.length; i++) {
       const curPoint = path[i]
@@ -210,15 +216,22 @@ function inject (bot) {
       }
     }
 
-    if (!bot.pathfinder.enablePathShortcut || stateMovements.exclusionAreasStep.length !== 0 || path.length === 0) return path
+    if (!bot.pathfinder.enablePathShortcut || path.length === 0) return path
+    if (stateMovements.exclusionAreasStep.length !== 0) return path
 
     const newPath = []
     let lastNode = bot.entity.position
     for (let i = 1; i < path.length; i++) {
-      const node = path[i]
-      if (Math.abs(node.y - lastNode.y) > 0.5 || node.toBreak.length > 0 || node.toPlace.length > 0 || !physics.canStraightLineBetween(lastNode, node)) {
-        newPath.push(path[i - 1])
-        lastNode = path[i - 1]
+      const previous = path[i - 1]
+      const current = path[i]
+
+      if (Math.abs(current.y - lastNode.y) > 0.5 ||
+          current.toBreak.length > 0 ||
+          current.toPlace.length > 0 ||
+          current.parkour ||
+          !physics.canStraightLineBetween(lastNode, current)) {
+        newPath.push(previous)
+        lastNode = previous
       }
     }
     newPath.push(path[path.length - 1])
@@ -510,6 +523,7 @@ function inject (bot) {
         digging = true
         const b = nextPoint.toBreak.shift()
         const block = bot.blockAt(new Vec3(b.x, b.y, b.z), false)
+        if (!block) { throw new Error(`Block is null`) }
         const tool = bot.pathfinder.bestHarvestTool(block)
         fullStop()
 
@@ -546,7 +560,9 @@ function inject (bot) {
       // Open gates or doors
       if (placingBlock?.useOne) {
         if (!lockUseBlock.tryAcquire()) return
-        bot.activateBlock(bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z))).then(() => {
+        const gate = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z))
+        if (!gate) { throw new Error(`Gate is null`) }
+        bot.activateBlock(gate).then(() => {
           lockUseBlock.release()
           placingBlock = nextPoint.toPlace.shift()
         }, err => {
@@ -575,6 +591,7 @@ function inject (bot) {
             lockEquipItem.release()
             const refBlock = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z), false)
             if (!lockPlaceBlock.tryAcquire()) return
+            if (!refBlock) { throw new Error(`Ref block is null`) }
             if (interactableBlocks.includes(refBlock.name)) {
               bot.setControlState('sneak', true)
             }
@@ -633,6 +650,7 @@ function inject (bot) {
     bot.setControlState('forward', true)
     bot.setControlState('jump', false)
 
+    // @ts-ignore
     if (bot.entity.isInWater) {
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
@@ -648,6 +666,7 @@ function inject (bot) {
     } else if (physics.canWalkJump(path)) {
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
+      bot.setControlState('forward', false)
     } else {
       bot.setControlState('forward', false)
       bot.setControlState('sprint', false)

@@ -27,7 +27,7 @@ declare module 'mineflayer-pathfinder' {
 			movements: Movements,
 			goal: goals.Goal,
 			timeout?: number
-		): ComputedPath;
+		): PartiallyComputedPath;
 		getPathFromTo(
 			movements: Movements,
 			startPos: Vec3, 
@@ -238,7 +238,7 @@ declare module 'mineflayer-pathfinder' {
 	export interface GoalPlaceBlockOptions {
 		range: number;
 		LOS: boolean;
-		faces: Array<Vec3>;
+		faces: ReadonlyArray<Vec3>;
 		facing: 'north' | 'east' | 'south' | 'west' | 'up' | 'down';
 	}
 }
