@@ -22,6 +22,9 @@ function inject (bot) {
   const vineId = bot.registry.blocksByName.vine.id
   let stateMovements = new Movements(bot)
   let stateGoal = null
+  /**
+   * @type {AStar | null}
+   */
   let astarContext = null
   let astartTimedout = false
   let dynamicGoal = false
