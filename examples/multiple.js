@@ -1,4 +1,6 @@
+//@ts-nocheck
 const mineflayer = require('mineflayer')
+
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalInvert, GoalFollow } = require('mineflayer-pathfinder').goals
 
