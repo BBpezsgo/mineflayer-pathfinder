@@ -10,13 +10,15 @@ const Vec3 = require('vec3').Vec3
 
 const Physics = require('./lib/physics')
 const nbt = require('prismarine-nbt')
-    // @ts-ignore
+// @ts-ignore
 const interactableBlocks = require('./lib/interactable.json')
+
+const error = 0.35
 
 /**
  * @param {import('mineflayer').Bot} bot
  */
-function inject (bot) {
+function inject(bot) {
   const waterType = bot.registry.blocksByName.water.id
   const ladderId = bot.registry.blocksByName.ladder.id
   const vineId = bot.registry.blocksByName.vine.id
@@ -28,14 +30,20 @@ function inject (bot) {
   let astarContext = null
   let astartTimedout = false
   let dynamicGoal = false
+  /** @type {Array<Move>} */
   let path = []
   let pathUpdated = false
   let digging = false
   let placing = false
   let placingBlock = null
   let lastNodeTime = performance.now()
+  let lastPosition = bot.entity?.position.clone() ?? new Vec3(0, 0, 0)
+  let lastPositionTime = performance.now()
   let returningPos = null
   let stopPathing = false
+  /** @type {Array<{ position: Vec3; }>} */
+  const openedGates = []
+
   const physics = new Physics(bot)
   const lockPlaceBlock = new Lock()
   const lockEquipItem = new Lock()
@@ -75,7 +83,7 @@ function inject (bot) {
     return result
   }
 
-  bot.pathfinder.getPathFromTo = function * (movements, startPos, goal, options = {}) {
+  bot.pathfinder.getPathFromTo = function*(movements, startPos, goal, options = {}) {
     const optimizePath = options.optimizePath ?? true
     const resetEntityIntersects = options.resetEntityIntersects ?? true
     const timeout = options.timeout ?? bot.pathfinder.thinkTimeout
@@ -111,23 +119,23 @@ function inject (bot) {
 
   Object.defineProperties(bot.pathfinder, {
     goal: {
-      get () {
+      get() {
         return stateGoal
       }
     },
     movements: {
-      get () {
+      get() {
         return stateMovements
       }
     },
     path: {
-      get () {
+      get() {
         return path
       }
     }
   })
 
-  function detectDiggingStopped () {
+  function detectDiggingStopped() {
     digging = false
     // @ts-ignore
     bot.removeAllListeners('diggingAborted', detectDiggingStopped)
@@ -145,7 +153,7 @@ function inject (bot) {
     bot.setControlState('sneak', stateMovements.sneak)
   }
 
-  function resetPath (reason, clearStates = true) {
+  function resetPath(reason, clearStates = true) {
     if (!stopPathing && path.length > 0) bot.emit('path_reset', reason)
     path = []
     if (digging) {
@@ -195,7 +203,7 @@ function inject (bot) {
   /**
    * @param {Array<Move>} path
    */
-  function postProcessPath (path) {
+  function postProcessPath(path) {
     for (let i = 0; i < path.length; i++) {
       const curPoint = path[i]
       if (curPoint.toBreak.length > 0 || curPoint.toPlace.length > 0) break
@@ -241,7 +249,7 @@ function inject (bot) {
     return newPath
   }
 
-  function pathFromPlayer (path) {
+  function pathFromPlayer(path) {
     if (path.length === 0) return
     let minI = 0
     let minDistance = 1000
@@ -260,7 +268,8 @@ function inject (bot) {
     const dx = n1.x - bot.entity.position.x
     const dy = n1.y - bot.entity.position.y
     const dz = n1.z - bot.entity.position.z
-    const reached = Math.abs(dx) <= 0.35 && Math.abs(dz) <= 0.35 && Math.abs(dy) < 1
+
+    const reached = Math.abs(dx) <= error && Math.abs(dz) <= error && Math.abs(dy) < 1
     if (minI + 1 < path.length && n1.toBreak.length === 0 && n1.toPlace.length === 0) {
       const n2 = path[minI + 1]
       const d2 = bot.entity.position.distanceSquared(n2)
@@ -271,7 +280,7 @@ function inject (bot) {
     path.splice(0, minI)
   }
 
-  function isPositionNearPath (pos, path) {
+  function isPositionNearPath(pos, path) {
     let prevNode = null
     for (const node of path) {
       let comparisonPoint = null
@@ -319,7 +328,7 @@ function inject (bot) {
     return false
   }
 
-  function closestPointOnLineSegment (point, segmentStart, segmentEnd) {
+  function closestPointOnLineSegment(point, segmentStart, segmentEnd) {
     const segmentLength = segmentEnd.minus(segmentStart).norm()
 
     if (segmentLength === 0) {
@@ -338,7 +347,7 @@ function inject (bot) {
 
   // Return the average x/z position of the highest standing positions
   // in the block.
-  function getPositionOnTopOf (block) {
+  function getPositionOnTopOf(block) {
     if (!block || block.shapes.length === 0) return null
     const p = new Vec3(0.5, 0, 0.5)
     let n = 1
@@ -364,7 +373,7 @@ function inject (bot) {
    * Stop the bot's movement and recenter to the center off the block when the bot's hitbox is partially beyond the
    * current blocks dimensions.
    */
-  function fullStop () {
+  function fullStop() {
     clearControlStates()
 
     // Force horizontal velocity to 0 (otherwise inertia can move us too far)
@@ -381,10 +390,10 @@ function inject (bot) {
     if (Math.abs(bot.entity.position.z - blockZ) > 0.2) { bot.entity.position.z = blockZ }
   }
 
-  function moveToEdge (refBlock, edge) {
+  function moveToEdge(refBlock, edge) {
     // If allowed turn instantly should maybe be a bot option
     const allowInstantTurn = false
-    function getViewVector (pitch, yaw) {
+    function getViewVector(pitch, yaw) {
       const csPitch = Math.cos(pitch)
       const snPitch = Math.sin(pitch)
       const csYaw = Math.cos(yaw)
@@ -412,7 +421,7 @@ function inject (bot) {
     return true
   }
 
-  function moveToBlock (pos) {
+  function moveToBlock(pos) {
     // minDistanceSq = Min distance sqrt to the target pos were the bot is centered enough to place blocks around him
     const minDistanceSq = 0.2 * 0.2
     const targetPos = pos.clone().offset(0.5, 0, 0.5)
@@ -427,7 +436,7 @@ function inject (bot) {
     return true
   }
 
-  function stop () {
+  function stop() {
     stopPathing = false
     stateGoal = null
     path = []
@@ -456,7 +465,46 @@ function inject (bot) {
     }
   })
 
-  function monitorMovement () {
+  function monitorMovement() {
+    // if (performance.now() - lastPositionTime > 500 &&
+    //   path.length > 0 &&
+    //   !('__toCenter' in path[0])) {
+    //   const d = bot.entity.position.distanceTo(lastPosition)
+    //   lastPosition = bot.entity.position.clone()
+    //   lastPositionTime = performance.now()
+    // 
+    //   if (d < 0.5) {
+    //     const p = bot.entity.position.floored().offset(0.5, 0, 0.5)
+    //     const move = new Move(p.x, p.y, p.z, path[0]?.remainingBlocks ?? 0, new Cost(d, d * 0))
+    //     move['__toCenter'] = true
+    //     path.unshift(move)
+    //   }
+    // }
+
+    if (openedGates.length > 0 && path.length > 0) {
+      const openedGate = openedGates[0]
+      const bruh = path[0] ?? new Vec3(0, 0, 0)
+      const bruhDx = Math.abs(bruh.x - openedGate.position.x)
+      const bruhDy = Math.abs(bruh.y - openedGate.position.y)
+      const bruhDz = Math.abs(bruh.z - openedGate.position.z)
+      if (bruhDx > 1 || bruhDy > 1 || bruhDz > 1) {
+        const gate = bot.blockAt(openedGate.position)
+        if (!gate) { throw new Error(`Gate is null`) }
+        if (lockUseBlock.tryAcquire()) {
+          if (gate.getProperties()['open']) {
+            // console.log(`CLOSE GATE ${openedGate.position}`)
+            bot.activateBlock(gate).then(() => {
+              openedGates.shift()
+              lockUseBlock.release()
+            }, err => {
+              console.error(err)
+            })
+            return
+          }
+        }
+      }
+    }
+
     // Test freemotion
     if (stateMovements && stateMovements.allowFreeMotion && stateGoal && stateGoal.entity) {
       const target = stateGoal.entity
@@ -472,6 +520,7 @@ function inject (bot) {
         return
       }
     }
+
     if (stateGoal) {
       if (!stateGoal.isValid()) {
         stop()
@@ -525,6 +574,7 @@ function inject (bot) {
       if (!digging && bot.entity.onGround) {
         digging = true
         const b = nextPoint.toBreak.shift()
+        if (!b) { throw new Error(`Block position is null`) }
         const block = bot.blockAt(new Vec3(b.x, b.y, b.z), false)
         if (!block) { throw new Error(`Block is null`) }
         const tool = bot.pathfinder.bestHarvestTool(block)
@@ -535,7 +585,7 @@ function inject (bot) {
             .catch(_ignoreError => {
               resetPath('dig_error')
             })
-            .then(function () {
+            .then(function() {
               lastNodeTime = performance.now()
               digging = false
             })
@@ -545,52 +595,65 @@ function inject (bot) {
           digBlock()
         } else {
           bot.equip(tool, 'hand')
-            .catch(_ignoreError => {})
+            .catch(_ignoreError => { })
             .then(() => digBlock())
         }
       }
       return
     }
+
     // Handle block placement
     // TODO: sneak when placing or make sure the block is not interactive
     if (placing || nextPoint.toPlace.length > 0) {
+      // Open gates or doors
+      if (placingBlock?.useOne) {
+        const gate = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z))
+        if (!gate) { throw new Error(`Gate is null`) }
+        if (!gate.getProperties()['open']) {
+          if (!lockUseBlock.tryAcquire()) return
+          // console.log(`OPEN GATE ${gate.position}`)
+          if (!openedGates.find(v => v.position.equals(gate.position))) { openedGates.push({ position: gate.position.clone() }) }
+          bot.activateBlock(gate).then(() => {
+            lockUseBlock.release()
+            placingBlock = nextPoint.toPlace.shift()
+          }, err => {
+            console.error(err)
+            lockUseBlock.release()
+          })
+        } else {
+          placingBlock = nextPoint.toPlace.shift()
+          // console.log(`GATE ALREADY OPEN ${gate.position}`)
+          if (!openedGates.find(v => v.position.equals(gate.position))) { openedGates.push({ position: gate.position.clone() }) }
+        }
+        return
+      }
+
       if (!placing) {
         placing = true
         placingBlock = nextPoint.toPlace.shift()
         fullStop()
       }
 
-      // Open gates or doors
-      if (placingBlock?.useOne) {
-        if (!lockUseBlock.tryAcquire()) return
-        const gate = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z))
-        if (!gate) { throw new Error(`Gate is null`) }
-        bot.activateBlock(gate).then(() => {
-          lockUseBlock.release()
-          placingBlock = nextPoint.toPlace.shift()
-        }, err => {
-          console.error(err)
-          lockUseBlock.release()
-        })
-        return
-      }
       const block = stateMovements.getScaffoldingItem()
       if (!block) {
         resetPath('no_scaffolding_blocks')
         return
       }
+
       if (bot.pathfinder.LOSWhenPlacingBlocks && placingBlock.y === bot.entity.position.floored().y - 1 && placingBlock.dy === 0) {
         if (!moveToEdge(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z), new Vec3(placingBlock.dx, 0, placingBlock.dz))) return
       }
+
       let canPlace = true
       if (placingBlock.jump) {
         bot.setControlState('jump', true)
         canPlace = placingBlock.y + 1 < bot.entity.position.y
       }
+
       if (canPlace) {
         if (!lockEquipItem.tryAcquire()) return
         bot.equip(block, 'hand')
-          .then(function () {
+          .then(function() {
             lockEquipItem.release()
             const refBlock = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z), false)
             if (!lockPlaceBlock.tryAcquire()) return
@@ -599,7 +662,7 @@ function inject (bot) {
               bot.setControlState('sneak', true)
             }
             bot.placeBlock(refBlock, new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz))
-              .then(function () {
+              .then(function() {
                 // Dont release Sneak if the block placement was not successful
                 bot.setControlState('sneak', stateMovements.sneak)
                 if (bot.pathfinder.LOSWhenPlacingBlocks && placingBlock.returnPos) returningPos = placingBlock.returnPos.clone()
@@ -613,7 +676,7 @@ function inject (bot) {
                 lastNodeTime = performance.now()
               })
           })
-          .catch(_ignoreError => {})
+          .catch(_ignoreError => { })
       }
       return
     }
@@ -621,7 +684,8 @@ function inject (bot) {
     let dx = nextPoint.x - p.x
     const dy = nextPoint.y - p.y
     let dz = nextPoint.z - p.z
-    if (Math.abs(dx) <= 0.35 && Math.abs(dz) <= 0.35 && Math.abs(dy) < 1) {
+
+    if (Math.abs(dx) <= error && Math.abs(dz) <= error && Math.abs(dy) < 1) {
       // arrived at next point
       lastNodeTime = performance.now()
       if (stopPathing) {
@@ -649,29 +713,56 @@ function inject (bot) {
       dz = nextPoint.z - p.z
     }
 
-    bot.look(Math.atan2(-dx, -dz), 0)
-    bot.setControlState('forward', true)
-    bot.setControlState('jump', false)
-
     // @ts-ignore
     if (bot.entity.isInWater) {
+      // console.log('WATER')
+      bot.look(Math.atan2(-dx, -dz), 0)
+      bot.setControlState('forward', true)
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
     } else if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
+      // console.log('SPRINT')
+      bot.look(Math.atan2(-dx, -dz), 0)
+      bot.setControlState('forward', true)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', true)
     } else if (stateMovements.allowSprinting && physics.canSprintJump(path)) {
+      // console.log('SPRINT UP')
+      bot.look(Math.atan2(-dx, -dz), 0)
+      bot.setControlState('forward', true)
       bot.setControlState('jump', true)
       bot.setControlState('sprint', true)
     } else if (physics.canStraightLine(path)) {
+      // console.log('WALK')
+      bot.look(Math.atan2(-dx, -dz), 0)
+      bot.setControlState('forward', true)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
     } else if (physics.canWalkJump(path)) {
+      // console.log('JUMP UP')
+      bot.look(Math.atan2(-dx, -dz), 0)
+      bot.setControlState('forward', true)
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
-      bot.setControlState('forward', false)
     } else {
-      bot.setControlState('forward', false)
+      bot.look(Math.atan2(-dx, -dz), 0)
+      let up = false
+      if (dy > 0.5) {
+        if (bot.blockAt(bot.entity.position)?.name === 'twisting_vines_plant') {
+          if (Math.abs(dx) < 0.5 && Math.abs(dz) <= 0.5) {
+            // console.log('UP')
+            bot.setControlState('forward', false)
+            bot.setControlState('jump', true)
+            bot.setControlState('sprint', false)
+            up = true
+          }
+        }
+      }
+      if (!up) {
+        // console.log('NONE')
+      }
+      bot.setControlState('forward', true)
+      bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
     }
 
@@ -681,6 +772,7 @@ function inject (bot) {
     if (performance.now() - lastNodeTime > 3500) {
       // should never take this long to go to the next node
       resetPath('stuck')
+      // console.warn('stuck')
     }
   }
 }
