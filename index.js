@@ -74,6 +74,7 @@ const error = 0.35
  *	tickTimeout: number;
  *	readonly goal: import('./lib/goals').GoalBase | null;
  *	readonly movements: Movements;
+ *  readonly path: ReadonlyArray<Move>
  *	searchRadius: number;
  *	enablePathShortcut: boolean;
  *	LOSWhenPlacingBlocks: boolean;
