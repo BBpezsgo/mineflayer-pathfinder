@@ -937,6 +937,7 @@ function inject(bot) {
     }
   }
 }
+inject.pluginName = 'pathfinder'
 
 module.exports = {
   pathfinder: inject,
