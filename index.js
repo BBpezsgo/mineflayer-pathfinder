@@ -18,8 +18,6 @@ const interactableBlocks = require('./lib/interactable.json')
 const { Block } = require('prismarine-block')
 const { Item } = require('prismarine-item')
 
-const error = 0.35
-
 /**
  * @typedef {{
  *   cost: number;
@@ -70,6 +68,7 @@ const error = 0.35
 
 /**
  * @typedef {{
+ *  readonly error: number;
  *	thinkTimeout: number;
  *	tickTimeout: number;
  *	readonly goal: import('./lib/goals').GoalBase | null;
@@ -143,9 +142,10 @@ function inject(bot) {
 
   // @ts-ignore
   bot.pathfinder = {
+    error: 0.35,
     thinkTimeout: 5000, // ms
     tickTimeout: 40, // ms, amount of thinking per tick (max 50 ms)
-    searchRadius: -1, // in blocks, limits of the search area, -1: don't limit the search
+    searchRadius: Infinity, // in blocks, limits of the search area
     enablePathShortcut: false, // disabled by default as it can cause bugs in specific configurations
     LOSWhenPlacingBlocks: true,
     lookAtTarget: true,
@@ -369,7 +369,7 @@ function inject(bot) {
     const dy = n1.y - bot.entity.position.y
     const dz = n1.z - bot.entity.position.z
 
-    const reached = Math.abs(dx) <= error && Math.abs(dz) <= error && Math.abs(dy) < 1
+    const reached = Math.abs(dx) <= bot.pathfinder.error && Math.abs(dz) <= bot.pathfinder.error && Math.abs(dy) < 1
     if (minI + 1 < path.length && n1.toBreak.length === 0 && n1.toPlace.length === 0) {
       const n2 = path[minI + 1]
       const d2 = bot.entity.position.distanceSquared(n2)
@@ -790,11 +790,32 @@ function inject(bot) {
       return
     }
 
+    /**
+     * @param {Move} node 
+     */
+    const isNodeReached = function(node) {
+      const dx = node.x - p.x
+      const dy = node.y - p.y
+      const dz = node.z - p.z
+      return (
+        Math.abs(dx) <= bot.pathfinder.error &&
+        Math.abs(dz) <= bot.pathfinder.error &&
+        Math.abs(dy) < 1
+      )
+    }
+
+    for (let i = 1; i < Math.min(path.length, 4); i++) {
+      const node = path[i]
+      if (node.toPlace.length || node.toBreak.length) { break }
+      if (!isNodeReached(node)) { continue }
+      nextPoint = node
+    }
+
     let dx = nextPoint.x - p.x
     const dy = nextPoint.y - p.y
     let dz = nextPoint.z - p.z
 
-    if (Math.abs(dx) <= error && Math.abs(dz) <= error && Math.abs(dy) < 1) {
+    if (isNodeReached(nextPoint)) {
       // arrived at next point
       lastNodeTime = performance.now()
       if (stopPathing) {
@@ -822,10 +843,10 @@ function inject(bot) {
       dz = nextPoint.z - p.z
     }
 
-    const yaw = Math.atan2(-dx, -dz)
-    const pitch = 0
-
-    const goForward = () => {
+    /**
+     * @param {boolean} lookAtTarget
+     */
+    const goForward = (lookAtTarget) => {
       const controlsToForward = {
         forward: false,
         left: false,
@@ -833,9 +854,11 @@ function inject(bot) {
         back: false,
       }
 
-      if (!bot.pathfinder.lookAtTarget) {
-        const targetYaw = Math.atan2(-dx, -dz)
-        let diff = Math.round((targetYaw - bot.entity.yaw) * (180 / Math.PI))
+      const yaw = Math.atan2(-dx, -dz)
+      const pitch = 0
+
+      if (!lookAtTarget) {
+        let diff = Math.round((yaw - bot.entity.yaw) * (180 / Math.PI))
         if (diff < -180) { diff += 360 }
         // +x   left
         // -x   right
@@ -880,30 +903,52 @@ function inject(bot) {
       bot.setControlState('back', false)
     }
 
-    // @ts-ignore
     if (bot.entity.isInWater) {
       // console.log('WATER')
-      goForward()
+      let newTarget = null
+
+      const checkDistance = bot.entity.width / 2
+
+      if (stateMovements.getBlock(bot.entity.position, checkDistance, 0, 0)?.physical) {
+        newTarget = bot.entity.position.offset(-0.5, 0, 0)
+      } else if (stateMovements.getBlock(bot.entity.position, -checkDistance, 0, 0)?.physical) {
+        newTarget = bot.entity.position.offset(0.5, 0, 0)
+      }
+
+      if (stateMovements.getBlock(bot.entity.position, 0, 0, checkDistance)?.physical) {
+        newTarget = bot.entity.position.offset(0, 0, -0.5)
+      } else if (stateMovements.getBlock(bot.entity.position, 0, 0, -checkDistance)?.physical) {
+        newTarget = bot.entity.position.offset(0, 0, 0.5)
+      }
+
+      if (newTarget) {
+        dx = newTarget.x - p.x
+        dz = newTarget.z - p.z
+
+        goForward(false)
+      } else {
+        goForward(bot.pathfinder.lookAtTarget)
+      }
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
+    } else if (false && stateMovements.allowSprinting && physics.canSprintJump(path)) {
+      // console.log('SPRINT JUMP')
+      goForward(bot.pathfinder.lookAtTarget)
+      bot.setControlState('jump', true)
+      bot.setControlState('sprint', true)
     } else if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
       // console.log('SPRINT')
-      goForward()
+      goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
-      bot.setControlState('sprint', true)
-    } else if (stateMovements.allowSprinting && physics.canSprintJump(path)) {
-      // console.log('SPRINT UP')
-      goForward()
-      bot.setControlState('jump', true)
       bot.setControlState('sprint', true)
     } else if (physics.canStraightLine(path)) {
       // console.log('WALK')
-      goForward()
+      goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
     } else if (physics.canWalkJump(path)) {
-      // console.log('JUMP UP')
-      goForward()
+      // console.log('WALK JUMP')
+      goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
     } else {
@@ -920,9 +965,9 @@ function inject(bot) {
         }
       }
       if (!up) {
-        // console.log('NONE')
+        // console.log('WALK')
       }
-      goForward()
+      goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
     }
