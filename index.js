@@ -904,7 +904,6 @@ function inject(bot) {
     }
 
     if (bot.entity.isInWater) {
-      // console.log('WATER')
       let newTarget = null
 
       const checkDistance = bot.entity.width / 2
@@ -931,23 +930,19 @@ function inject(bot) {
       }
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
-    } else if (false && stateMovements.allowSprinting && physics.canSprintJump(path)) {
-      // console.log('SPRINT JUMP')
-      goForward(bot.pathfinder.lookAtTarget)
-      bot.setControlState('jump', true)
-      bot.setControlState('sprint', true)
     } else if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
-      // console.log('SPRINT')
       goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', true)
+    } else if (stateMovements.allowSprinting && physics.canSprintJump(path)) {
+      goForward(bot.pathfinder.lookAtTarget)
+      bot.setControlState('jump', true)
+      bot.setControlState('sprint', true)
     } else if (physics.canStraightLine(path)) {
-      // console.log('WALK')
       goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
     } else if (physics.canWalkJump(path)) {
-      // console.log('WALK JUMP')
       goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
