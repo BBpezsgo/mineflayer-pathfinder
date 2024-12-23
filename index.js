@@ -112,6 +112,7 @@ const { Item } = require('prismarine-item')
  */
 function inject(bot) {
   const waterType = bot.registry.blocksByName.water.id
+  const lavaType = bot.registry.blocksByName.lava.id
   const ladderId = bot.registry.blocksByName.ladder.id
   const vineId = bot.registry.blocksByName.vine.id
   let stateMovements = new Movements(bot)
@@ -305,7 +306,7 @@ function inject(bot) {
       const curPoint = path[i]
       if (curPoint.toBreak.length > 0 || curPoint.toPlace.length > 0) break
       const b = bot.blockAt(new Vec3(curPoint.x, curPoint.y, curPoint.z))
-      if (b && (b.type === waterType || ((b.type === ladderId || b.type === vineId) && i + 1 < path.length && path[i + 1].y < curPoint.y))) {
+      if (b && (b.type === waterType || b.type === lavaType || ((b.type === ladderId || b.type === vineId) && i + 1 < path.length && path[i + 1].y < curPoint.y))) {
         curPoint.x = Math.floor(curPoint.x) + 0.5
         curPoint.y = Math.floor(curPoint.y)
         curPoint.z = Math.floor(curPoint.z) + 0.5
@@ -903,7 +904,7 @@ function inject(bot) {
       bot.setControlState('back', false)
     }
 
-    if (bot.entity.isInWater) {
+    if (bot.entity.isInWater || bot.entity.isInLava) {
       let newTarget = null
 
       const checkDistance = bot.entity.width / 2
