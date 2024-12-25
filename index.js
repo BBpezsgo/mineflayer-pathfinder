@@ -582,9 +582,9 @@ function inject(bot) {
       const cx = chunk.x >> 4
       const cz = chunk.z >> 4
       if (astarContext.visitedChunks.has(`${cx - 1},${cz}`) ||
-        astarContext.visitedChunks.has(`${cx},${cz - 1}`) ||
-        astarContext.visitedChunks.has(`${cx + 1},${cz}`) ||
-        astarContext.visitedChunks.has(`${cx},${cz + 1}`)) {
+          astarContext.visitedChunks.has(`${cx},${cz - 1}`) ||
+          astarContext.visitedChunks.has(`${cx + 1},${cz}`) ||
+          astarContext.visitedChunks.has(`${cx},${cz + 1}`)) {
         resetPath('chunk_loaded', false)
       }
     }
@@ -635,6 +635,7 @@ function inject(bot) {
       if (!stateGoal.isValid()) {
         stop()
       } else if (stateGoal.hasChanged()) {
+        stateGoal['refresh']?.()
         resetPath('goal_moved', false)
       }
     }
@@ -948,21 +949,6 @@ function inject(bot) {
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
     } else {
-      let up = false
-      if (dy > 0.5) {
-        if (bot.blockAt(bot.entity.position)?.name === 'twisting_vines_plant') {
-          if (Math.abs(dx) < 0.5 && Math.abs(dz) <= 0.5) {
-            // console.log('UP')
-            noForward()
-            bot.setControlState('jump', true)
-            bot.setControlState('sprint', false)
-            up = true
-          }
-        }
-      }
-      if (!up) {
-        // console.log('WALK')
-      }
       goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
