@@ -63,6 +63,8 @@ const { Item } = require('prismarine-item')
  *   climbable: boolean
  *   openable: boolean
  *   canFall: boolean
+ *   canWalkOn: boolean
+ *   canJumpFrom: boolean
  * }} SafeBlock
  */
 
@@ -111,10 +113,10 @@ const { Item } = require('prismarine-item')
  * @param {import('mineflayer').Bot} bot
  */
 function inject(bot) {
-  const waterType = bot.registry.blocksByName.water.id
-  const lavaType = bot.registry.blocksByName.lava.id
-  const ladderId = bot.registry.blocksByName.ladder.id
-  const vineId = bot.registry.blocksByName.vine.id
+  const waterType = bot.registry.blocksByName['water'].id
+  const lavaType = bot.registry.blocksByName['lava'].id
+  const ladderId = bot.registry.blocksByName['ladder'].id
+  const vineId = bot.registry.blocksByName['vine'].id
   let stateMovements = new Movements(bot)
   /** @type {any} */
   let stateGoal = null
@@ -152,6 +154,9 @@ function inject(bot) {
     lookAtTarget: true,
   }
 
+  /**
+   * @param {Block} block
+   */
   bot.pathfinder.bestHarvestTool = (block) => {
     const availableTools = bot.inventory.items()
     const effects = bot.entity.effects
@@ -170,6 +175,11 @@ function inject(bot) {
     return bestTool
   }
 
+  /**
+   * @param {Movements} movements
+   * @param {goals.Goal} goal
+   * @param {number} timeout
+   */
   bot.pathfinder.getPathTo = (movements, goal, timeout) => {
     const generator = bot.pathfinder.getPathFromTo(movements, bot.entity.position, goal, { timeout })
     const { value: { result, astarContext: context } } = generator.next()
@@ -177,6 +187,19 @@ function inject(bot) {
     return result
   }
 
+  /**
+   * @param {Movements} movements
+   * @param {Vec3} startPos
+   * @param {goals.Goal} goal
+   * @param {{
+   *   optimizePath?: boolean;
+   *   resetEntityIntersects?: boolean;
+   *   timeout?: number;
+   *   tickTimeout?: number;
+   *   searchRadius?: number;
+   *   startMove?: Move;
+   * }} [options={}]
+   */
   bot.pathfinder.getPathFromTo = function*(movements, startPos, goal, options = {}) {
     const optimizePath = options.optimizePath ?? true
     const resetEntityIntersects = options.resetEntityIntersects ?? true
@@ -272,6 +295,10 @@ function inject(bot) {
     if (stopPathing) return stop()
   }
 
+  /**
+   * @param {goals.Goal} goal
+   * @param {boolean} [dynamic]
+   */
   bot.pathfinder.setGoal = (goal, dynamic = false) => {
     stateGoal = goal
     dynamicGoal = dynamic
@@ -279,6 +306,9 @@ function inject(bot) {
     resetPath('goal_updated')
   }
 
+  /**
+   * @param {Movements} movements
+   */
   bot.pathfinder.setMovements = (movements) => {
     stateMovements = movements
     resetPath('movements_updated')
@@ -288,6 +318,9 @@ function inject(bot) {
   bot.pathfinder.isMining = () => digging
   bot.pathfinder.isBuilding = () => placing
 
+  /**
+   * @param {goals.Goal} goal
+   */
   bot.pathfinder.goto = (goal) => {
     return gotoUtil(bot, goal)
   }
@@ -814,7 +847,7 @@ function inject(bot) {
     }
 
     let dx = nextPoint.x - p.x
-    const dy = nextPoint.y - p.y
+    let dy = nextPoint.y - p.y
     let dz = nextPoint.z - p.z
 
     if (isNodeReached(nextPoint)) {
@@ -842,6 +875,7 @@ function inject(bot) {
         return
       }
       dx = nextPoint.x - p.x
+      dy = nextPoint.y - p.y
       dz = nextPoint.z - p.z
     }
 
@@ -924,6 +958,7 @@ function inject(bot) {
 
       if (newTarget) {
         dx = newTarget.x - p.x
+        dy = newTarget.y - p.y
         dz = newTarget.z - p.z
 
         goForward(false)
