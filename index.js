@@ -3,7 +3,7 @@
 const { performance } = require('perf_hooks')
 
 const AStar = require('./lib/astar')
-const { Move } = require('./lib/move')
+const Move = require('./lib/move')
 const Movements = require('./lib/movements')
 const gotoUtil = require('./lib/goto')
 const Lock = require('./lib/lock')
@@ -29,7 +29,7 @@ const { Item } = require('prismarine-item')
  */
 
 /**
- * @typedef {"goal_updated" |
+ * @typedef {'goal_updated' |
  * 'movements_updated' |
  * 'block_updated' |
  * 'chunk_loaded' |
@@ -112,13 +112,13 @@ const { Item } = require('prismarine-item')
 /**
  * @param {import('mineflayer').Bot} bot
  */
-function inject(bot) {
+function inject (bot) {
   const waterType = bot.registry.blocksByName['water'].id
   const lavaType = bot.registry.blocksByName['lava'].id
   const ladderId = bot.registry.blocksByName['ladder'].id
   const vineId = bot.registry.blocksByName['vine'].id
   let stateMovements = new Movements(bot)
-  /** @type {any} */
+  /** @type {import('./lib/goals').GoalBase} */
   let stateGoal = null
   /** @type {AStar | null} */
   let astarContext = null
@@ -236,23 +236,23 @@ function inject(bot) {
 
   Object.defineProperties(bot.pathfinder, {
     goal: {
-      get() {
+      get () {
         return stateGoal
       }
     },
     movements: {
-      get() {
+      get () {
         return stateMovements
       }
     },
     path: {
-      get() {
+      get () {
         return path
       }
     }
   })
 
-  function detectDiggingStopped() {
+  function detectDiggingStopped () {
     digging = false
     // @ts-ignore
     bot.removeAllListeners('diggingAborted', detectDiggingStopped)
@@ -260,7 +260,7 @@ function inject(bot) {
     bot.removeAllListeners('diggingCompleted', detectDiggingStopped)
   }
 
-  function clearControlStates() {
+  function clearControlStates () {
     bot.setControlState('forward', false)
     bot.setControlState('back', false)
     bot.setControlState('left', false)
@@ -274,7 +274,7 @@ function inject(bot) {
    * @param {GoalUpdateReason} reason
    * @param {boolean} [clearStates]
    */
-  function resetPath(reason, clearStates = true) {
+  function resetPath (reason, clearStates = true) {
     if (!stopPathing && path.length > 0) bot.emit('path_reset', reason)
     path = []
     if (digging) {
@@ -329,12 +329,14 @@ function inject(bot) {
     stopPathing = true
   }
 
-  bot.on('physicsTick', monitorMovement)
+  bot.once('spawn', () => {
+    bot.on('physicsTick', monitorMovement)
+  })
 
   /**
    * @param {Array<Move>} path
    */
-  function postProcessPath(path) {
+  function postProcessPath (path) {
     for (let i = 0; i < path.length; i++) {
       const curPoint = path[i]
       if (curPoint.toBreak.length > 0 || curPoint.toPlace.length > 0) break
@@ -370,7 +372,7 @@ function inject(bot) {
       if (Math.abs(current.y - lastNode.y) > 0.5 ||
         current.toBreak.length > 0 ||
         current.toPlace.length > 0 ||
-        current.parkour ||
+        current.dontOptimize ||
         !physics.canStraightLineBetween(lastNode, current)) {
         newPath.push(previous)
         lastNode = previous
@@ -383,7 +385,7 @@ function inject(bot) {
   /**
    * @param {Array<Move>} path
    */
-  function pathFromPlayer(path) {
+  function pathFromPlayer (path) {
     if (path.length === 0) return
     let minI = 0
     let minDistance = 1000
@@ -418,7 +420,7 @@ function inject(bot) {
    * @param {Vec3} pos
    * @param {ReadonlyArray<Move>} path
    */
-  function isPositionNearPath(pos, path) {
+  function isPositionNearPath (pos, path) {
     let prevNode = null
     for (const node of path) {
       let comparisonPoint = null
@@ -471,7 +473,7 @@ function inject(bot) {
    * @param {Move} segmentStart
    * @param {Move} segmentEnd
    */
-  function closestPointOnLineSegment(point, segmentStart, segmentEnd) {
+  function closestPointOnLineSegment (point, segmentStart, segmentEnd) {
     const segmentLength = segmentEnd.minus(segmentStart).norm()
 
     if (segmentLength === 0) {
@@ -494,7 +496,7 @@ function inject(bot) {
    * 
    * @param {Block} block
    */
-  function getPositionOnTopOf(block) {
+  function getPositionOnTopOf (block) {
     if (!block || block.shapes.length === 0) return null
     const p = new Vec3(0.5, 0, 0.5)
     let n = 1
@@ -520,7 +522,7 @@ function inject(bot) {
    * Stop the bot's movement and recenter to the center off the block when the bot's hitbox is partially beyond the
    * current blocks dimensions.
    */
-  function fullStop() {
+  function fullStop () {
     clearControlStates()
 
     // Force horizontal velocity to 0 (otherwise inertia can move us too far)
@@ -541,14 +543,14 @@ function inject(bot) {
    * @param {Vec3} refBlock
    * @param {Vec3} edge
    */
-  function moveToEdge(refBlock, edge) {
+  function moveToEdge (refBlock, edge) {
     // If allowed turn instantly should maybe be a bot option
     const allowInstantTurn = false
     /**
      * @param {number} pitch
      * @param {number} yaw
      */
-    function getViewVector(pitch, yaw) {
+    function getViewVector (pitch, yaw) {
       const csPitch = Math.cos(pitch)
       const snPitch = Math.sin(pitch)
       const csYaw = Math.cos(yaw)
@@ -594,7 +596,7 @@ function inject(bot) {
     return true
   }
 
-  function stop() {
+  function stop () {
     stopPathing = false
     stateGoal = null
     path = []
@@ -623,7 +625,7 @@ function inject(bot) {
     }
   })
 
-  function monitorMovement() {
+  function monitorMovement () {
     if (openedGates.length > 0 && path.length > 0) {
       const openedGate = openedGates[0]
       const bruh = path[0] ?? new Vec3(0, 0, 0)
@@ -668,7 +670,7 @@ function inject(bot) {
       if (!stateGoal.isValid()) {
         stop()
       } else if (stateGoal.hasChanged()) {
-        stateGoal['refresh']?.()
+        stateGoal.refresh?.()
         resetPath('goal_moved', false)
       }
     }
@@ -791,7 +793,7 @@ function inject(bot) {
       let canPlace = true
       if (placingBlock.jump) {
         bot.setControlState('jump', true)
-        canPlace = placingBlock.y + 1 < bot.entity.position.y
+        canPlace = placingBlock.y + 2 < bot.entity.position.y
       }
 
       if (canPlace) {
@@ -891,7 +893,6 @@ function inject(bot) {
       }
 
       const yaw = Math.atan2(-dx, -dz)
-      const pitch = 0
 
       if (!lookAtTarget) {
         let diff = Math.round((yaw - bot.entity.yaw) * (180 / Math.PI))
@@ -924,7 +925,7 @@ function inject(bot) {
         }
       } else {
         controlsToForward.forward = true
-        bot.look(yaw, pitch)
+        bot.look(yaw, 0)
       }
 
       bot.setControlState('forward', controlsToForward.forward)
@@ -975,7 +976,7 @@ function inject(bot) {
       goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', true)
       bot.setControlState('sprint', true)
-    } else if (physics.canStraightLine(path)) {
+    } else if (physics.canStraightLine(path, false)) {
       goForward(bot.pathfinder.lookAtTarget)
       bot.setControlState('jump', false)
       bot.setControlState('sprint', false)
