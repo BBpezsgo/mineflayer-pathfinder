@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 /* Pathfinder Exclusion Area example
 
 This example shows the use of exclusion areas with the Movement Class.

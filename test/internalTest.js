@@ -1,8 +1,7 @@
-//@ts-nocheck
 /* eslint-env mocha */
 
 const mineflayer = require('mineflayer')
-const { goals, pathfinder, Movements } = require('mineflayer-pathfinder')
+const { goals, pathfinder, Movements } = require('..')
 const { Vec3 } = require('vec3')
 const mc = require('minecraft-protocol')
 const assert = require('assert')

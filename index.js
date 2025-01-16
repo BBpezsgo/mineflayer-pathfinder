@@ -54,17 +54,21 @@ const { Item } = require('prismarine-item')
  */
 
 /**
- * @typedef {Block & {
- *   safe: boolean
- *   physical: boolean
- *   liquid: boolean
- *   height: number
- *   replaceable: boolean
- *   climbable: boolean
- *   openable: boolean
- *   canFall: boolean
- *   canWalkOn: boolean
- *   canJumpFrom: boolean
+ * @typedef {{
+ *   stateId: number;
+ *   name: string;
+ *   id: number;
+ *   position: Vec3;
+ *   safe: boolean;
+ *   physical: boolean;
+ *   liquid: boolean;
+ *   height: number;
+ *   replaceable: boolean;
+ *   climbable: boolean;
+ *   openable: boolean;
+ *   canFall: boolean;
+ *   canWalkOn: boolean;
+ *   canJumpFrom: boolean;
  * }} SafeBlock
  */
 
@@ -132,6 +136,8 @@ function inject (bot) {
   /** @type {import('./lib/move').ToPlace} */
   let placingBlock = null
   let lastNodeTime = performance.now()
+  /** @type {Vec3} */
+  let lastPosition = null
   /** @type {any} */
   let returningPos = null
   let stopPathing = false
@@ -215,7 +221,7 @@ function inject (bot) {
       const b = bot.blockAt(p) // The block we are standing in
       // Offset the floored bot position by one if we are standing on a block that has not the full height but is solid
       const offset = (b && dy > 0.001 && bot.entity.onGround && !stateMovements.emptyBlocks.has(b.type)) ? 1 : 0
-      start = new Move(p.x, p.y + offset, p.z, movements.countScaffoldingItems(), 0)
+      start = new Move(p.x, p.y + offset, p.z, movements.countScaffoldingItems(), 0, [], [], false, 'forward', 'optional')
     }
     if (movements.allowEntityDetection) {
       if (resetEntityIntersects) {
@@ -360,26 +366,46 @@ function inject (bot) {
       }
     }
 
-    if (!bot.pathfinder.enablePathShortcut || path.length === 0) return path
+    if (path.length === 0) return path
     if (stateMovements.exclusionAreasStep.length !== 0) return path
 
-    const newPath = []
-    let lastNode = bot.entity.position
-    for (let i = 1; i < path.length; i++) {
-      const previous = path[i - 1]
-      const current = path[i]
+    if (!bot.pathfinder.enablePathShortcut) {
+      const newPath = []
+      let lastDirection = new Vec3(0, 0, 0)
+      for (let i = 1; i < path.length; i++) {
+        const previous = path[i - 1]
+        const current = path[i]
+        const direction = current.clone().subtract(previous)
 
-      if (Math.abs(current.y - lastNode.y) > 0.5 ||
-        current.toBreak.length > 0 ||
-        current.toPlace.length > 0 ||
-        current.dontOptimize ||
-        !physics.canStraightLineBetween(lastNode, current)) {
-        newPath.push(previous)
-        lastNode = previous
+        if (current.toBreak.length > 0 ||
+          current.toPlace.length > 0 ||
+          current.dontOptimize ||
+          !lastDirection.equals(direction)) {
+          newPath.push(previous)
+          lastDirection = direction
+        }
       }
+      newPath.push(path[path.length - 1])
+      return newPath
+    } else {
+      const newPath = []
+      let lastNode = bot.entity.position
+      for (let i = 1; i < path.length; i++) {
+        const previous = path[i - 1]
+        const current = path[i]
+
+        if (Math.abs(current.y - lastNode.y) > 0 ||
+          current.toBreak.length > 0 ||
+          current.toPlace.length > 0 ||
+          current.dontOptimize ||
+          !physics.canStraightLineBetween(lastNode, current)) {
+          newPath.push(previous)
+          lastNode = previous
+        }
+      }
+      newPath.push(path[path.length - 1])
+      return newPath
     }
-    newPath.push(path[path.length - 1])
-    return newPath
   }
 
   /**
@@ -581,7 +607,7 @@ function inject (bot) {
   /**
    * @param {Vec3} pos
    */
-  function moveToBlock(pos) {
+  function moveToBlock (pos) {
     // minDistanceSq = Min distance sqrt to the target pos were the bot is centered enough to place blocks around him
     const minDistanceSq = 0.2 * 0.2
     const targetPos = pos.clone().offset(0.5, 0, 0.5)
@@ -617,9 +643,9 @@ function inject (bot) {
       const cx = chunk.x >> 4
       const cz = chunk.z >> 4
       if (astarContext.visitedChunks.has(`${cx - 1},${cz}`) ||
-          astarContext.visitedChunks.has(`${cx},${cz - 1}`) ||
-          astarContext.visitedChunks.has(`${cx + 1},${cz}`) ||
-          astarContext.visitedChunks.has(`${cx},${cz + 1}`)) {
+        astarContext.visitedChunks.has(`${cx},${cz - 1}`) ||
+        astarContext.visitedChunks.has(`${cx + 1},${cz}`) ||
+        astarContext.visitedChunks.has(`${cx},${cz + 1}`)) {
         resetPath('chunk_loaded', false)
       }
     }
@@ -653,7 +679,7 @@ function inject (bot) {
     // Test freemotion
     if (stateMovements && stateMovements.allowFreeMotion && stateGoal && stateGoal.entity) {
       const target = stateGoal.entity
-      if (physics.canStraightLine([target.position])) {
+      if (physics.canStraightLine([target.position], false)) {
         bot.lookAt(target.position.offset(0, 1.6, 0))
 
         if (target.position.distanceSquared(bot.entity.position) > stateGoal.rangeSq) {
@@ -798,33 +824,42 @@ function inject (bot) {
 
       if (canPlace) {
         if (!lockEquipItem.tryAcquire()) return
-        bot.equip(block, 'hand')
-          .then(function() {
-            lockEquipItem.release()
-            const refBlock = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z), false)
-            if (!lockPlaceBlock.tryAcquire()) return
-            if (!refBlock) { throw new Error(`Ref block is null`) }
-            if (interactableBlocks.includes(refBlock.name)) {
-              bot.setControlState('sneak', true)
-            }
-            bot.placeBlock(refBlock, new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz))
-              .then(function() {
-                // Dont release Sneak if the block placement was not successful
-                bot.setControlState('sneak', stateMovements.sneak)
-                if (bot.pathfinder.LOSWhenPlacingBlocks && placingBlock.returnPos) returningPos = placingBlock.returnPos.clone()
-              })
-              .catch(_ignoreError => {
-                resetPath('place_error')
-              })
-              .then(() => {
-                lockPlaceBlock.release()
-                placing = false
-                lastNodeTime = performance.now()
-              })
+        const place = () => {
+          lockEquipItem.release()
+          const refBlock = bot.blockAt(new Vec3(placingBlock.x, placingBlock.y, placingBlock.z), false)
+          if (!lockPlaceBlock.tryAcquire()) return
+          if (!refBlock) { throw new Error(`Ref block is null`) }
+          if (interactableBlocks.includes(refBlock.name)) {
+            bot.setControlState('sneak', true)
+          }
+          bot.setControlState('jump', false)
+          bot._placeBlockWithOptions(refBlock, new Vec3(placingBlock.dx, placingBlock.dy, placingBlock.dz), {
+            forceLook: 'ignore',
           })
-          .catch(_ignoreError => { })
+            .then(function() {
+              // Dont release Sneak if the block placement was not successful
+              bot.setControlState('sneak', stateMovements.sneak)
+              if (bot.pathfinder.LOSWhenPlacingBlocks && placingBlock.returnPos) returningPos = placingBlock.returnPos.clone()
+            })
+            .catch(_ignoreError => {
+              resetPath('place_error')
+            })
+            .then(() => {
+              lockPlaceBlock.release()
+              placing = false
+              lastNodeTime = performance.now()
+            })
+        }
+        if (bot.heldItem?.name !== block.name) {
+          bot.equip(block, 'hand')
+            .then(function() {
+              place()
+            })
+            .catch(_ignoreError => { })
+        } else {
+          place()
+        }
       }
-      return
     }
 
     /**
@@ -968,35 +1003,108 @@ function inject (bot) {
       }
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
-    } else if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
-      goForward(bot.pathfinder.lookAtTarget)
-      bot.setControlState('jump', false)
-      bot.setControlState('sprint', true)
-    } else if (stateMovements.allowSprinting && physics.canSprintJump(path)) {
-      goForward(bot.pathfinder.lookAtTarget)
-      bot.setControlState('jump', true)
-      bot.setControlState('sprint', true)
-    } else if (physics.canStraightLine(path, false)) {
-      goForward(bot.pathfinder.lookAtTarget)
-      bot.setControlState('jump', false)
-      bot.setControlState('sprint', false)
-    } else if (physics.canWalkJump(path)) {
-      goForward(bot.pathfinder.lookAtTarget)
-      bot.setControlState('jump', true)
-      bot.setControlState('sprint', false)
     } else {
-      goForward(bot.pathfinder.lookAtTarget)
-      bot.setControlState('jump', false)
-      bot.setControlState('sprint', false)
+      (() => {
+        const sprint = {
+          'no': false,
+          'optional': stateMovements.allowSprinting,
+          'yes': true,
+        }[nextPoint.sprint]
+
+        switch (nextPoint.type) {
+          case 'forward':
+          case 'diagonal':
+          case 'diagonal-down':
+          case 'drop-down':
+          case 'down':
+            if (physics.canStraightLine(path, sprint)) {
+              goForward(bot.pathfinder.lookAtTarget)
+              bot.setControlState('jump', false)
+              bot.setControlState('sprint', sprint)
+              return
+            }
+
+            break
+          case 'parkour':
+            if (physics.canStraightLine(path, sprint)) {
+              goForward(bot.pathfinder.lookAtTarget)
+              bot.setControlState('jump', false)
+              bot.setControlState('sprint', sprint)
+              return
+            }
+
+            if (physics.canJump(path, sprint)) {
+              goForward(bot.pathfinder.lookAtTarget)
+              bot.setControlState('jump', true)
+              bot.setControlState('sprint', sprint)
+              return
+            }
+
+            break
+          case 'diagonal-up':
+          case 'jump-up':
+            if (physics.canJump(path, sprint)) {
+              goForward(bot.pathfinder.lookAtTarget)
+              bot.setControlState('jump', true)
+              bot.setControlState('sprint', sprint)
+              return
+            }
+
+            break
+          default:
+            console.log(nextPoint.type)
+            break
+        }
+
+        if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
+          goForward(bot.pathfinder.lookAtTarget)
+          bot.setControlState('jump', false)
+          bot.setControlState('sprint', true)
+          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'straight-sprint')
+          return
+        }
+
+        if (stateMovements.allowSprinting && physics.canJump(path, true)) {
+          goForward(bot.pathfinder.lookAtTarget)
+          bot.setControlState('jump', true)
+          bot.setControlState('sprint', true)
+          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'jump-sprint')
+          return
+        }
+
+        if (physics.canStraightLine(path, false)) {
+          goForward(bot.pathfinder.lookAtTarget)
+          bot.setControlState('jump', false)
+          bot.setControlState('sprint', false)
+          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'straight')
+          return
+        }
+
+        if (physics.canJump(path, false)) {
+          goForward(bot.pathfinder.lookAtTarget)
+          bot.setControlState('jump', true)
+          bot.setControlState('sprint', false)
+          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'jump')
+          return
+        }
+
+        {
+          goForward(bot.pathfinder.lookAtTarget)
+          bot.setControlState('jump', false)
+          bot.setControlState('sprint', false)
+          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'default')
+        }
+      })()
     }
 
     if (stateMovements.sneak) { bot.setControlState('sneak', true) }
 
     // check for futility
-    if (performance.now() - lastNodeTime > 3500) {
-      // should never take this long to go to the next node
+    if (!lastPosition || bot.entity.position.clone().distanceSquared(lastPosition) >= 1) {
+      lastPosition = bot.entity.position.clone()
+      lastNodeTime = performance.now()
+    } else if (performance.now() - lastNodeTime > 1000) {
       resetPath('stuck')
-      // console.warn('stuck')
     }
   }
 }

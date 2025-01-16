@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 const mineflayer = require('mineflayer')
 const { pathfinder, Movements } = require('mineflayer-pathfinder')
 const { GoalNear, GoalBlock, GoalXZ, GoalY, GoalFollow, GoalPlaceBlock, GoalLookAtBlock } = require('mineflayer-pathfinder').goals
@@ -116,7 +114,7 @@ bot.once('spawn', () => {
     }
   })
 
-  const rayTraceEntitySight = function(entity) {
+  const rayTraceEntitySight = function (entity) {
     if (bot.world?.raycast) {
       const { height, position, yaw, pitch } = entity
       const x = -Math.sin(yaw) * Math.cos(pitch)
@@ -135,14 +133,19 @@ bot.once('spawn', () => {
 bot.on('error', console.error)
 bot.on('kicked', console.error)
 
-function directionToVector(dir) {
-  switch (dir) {
-    case 0: return new Vec3(0, -1, 0)
-    case 1: return new Vec3(0, 1, 0)
-    case 2: return new Vec3(0, 0, -1)
-    case 3: return new Vec3(0, 0, 1)
-    case 4: return new Vec3(-1, 0, 0)
-    case 5: return new Vec3(1, 0, 0)
-    default: return null
+function directionToVector (dir) {
+  if (dir > 5 || dir < 0) return null
+  if (dir === 0) {
+    return new Vec3(0, -1, 0)
+  } else if (dir === 1) {
+    return new Vec3(0, 1, 0)
+  } else if (dir === 2) {
+    return new Vec3(0, 0, -1)
+  } else if (dir === 3) {
+    return new Vec3(0, 0, 1)
+  } else if (dir === 4) {
+    return new Vec3(-1, 0, 0)
+  } else if (dir === 5) {
+    return new Vec3(1, 0, 0)
   }
 }

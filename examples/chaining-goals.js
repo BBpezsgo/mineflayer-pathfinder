@@ -1,5 +1,3 @@
-//@ts-nocheck
-
 /* Pathfinder Chaining Goals example
 
 This example shows how to chain goals together.

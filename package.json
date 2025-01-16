@@ -13,20 +13,18 @@
   "author": "Karang",
   "license": "MIT",
   "dependencies": {
+    "debug": "^4.4.0",
     "minecraft-data": "^3.67.0",
     "prismarine-block": "^1.17.1",
     "prismarine-entity": "^2.4.0",
     "prismarine-item": "^1.14.0",
     "prismarine-nbt": "^2.5.0",
-    "prismarine-physics": "^1.8.0",
+    "prismarine-physics": "file:../prismarine-physics",
     "vec3": "^0.1.10"
   },
   "devDependencies": {
-    "minecraft-wrap": "^1.5.1",
-    "mineflayer": "^4.20.1",
-    "mineflayer-pathfinder": "file:./",
-    "mocha": "^10.7.0",
-    "prismarine-schematic": "^1.2.3",
-    "standard": "^17.1.0"
+    "minecraft-protocol": "^1.53.0",
+    "mineflayer": "file:../mineflayer",
+    "prismarine-schematic": "^1.2.3"
   }
 }
