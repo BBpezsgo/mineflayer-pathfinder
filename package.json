@@ -23,8 +23,11 @@
     "vec3": "^0.1.10"
   },
   "devDependencies": {
-    "minecraft-protocol": "^1.53.0",
+    "minecraft-wrap": "^1.2.1",
     "mineflayer": "file:../mineflayer",
-    "prismarine-schematic": "^1.2.3"
+    "mineflayer-pathfinder": "file:./",
+    "mocha": "^11.0.1",
+    "prismarine-schematic": "^1.2.3",
+    "standard": "^17.0.0"
   }
 }
