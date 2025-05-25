@@ -273,7 +273,7 @@ function inject (bot) {
     bot.setControlState('right', false)
     bot.setControlState('jump', false)
     bot.setControlState('sprint', false)
-    bot.setControlState('sneak', stateMovements.sneak)
+    bot.setControlState('sneak', stateMovements.sneak())
   }
 
   /**
@@ -600,7 +600,7 @@ function inject (bot) {
       return false
     }
     bot.setControlState('back', false)
-    if (stateMovements.sneak) { bot.setControlState('sneak', true) }
+    if (stateMovements.sneak()) { bot.setControlState('sneak', true) }
     return true
   }
 
@@ -614,11 +614,11 @@ function inject (bot) {
     if (bot.entity.position.distanceSquared(targetPos) > minDistanceSq) {
       bot.lookAt(targetPos)
       bot.setControlState('forward', true)
-      if (stateMovements.sneak) { bot.setControlState('sneak', true) }
+      if (stateMovements.sneak()) { bot.setControlState('sneak', true) }
       return false
     }
     bot.setControlState('forward', false)
-    if (stateMovements.sneak) { bot.setControlState('sneak', true) }
+    if (stateMovements.sneak()) { bot.setControlState('sneak', true) }
     return true
   }
 
@@ -676,6 +676,8 @@ function inject (bot) {
       }
     }
 
+    bot.setControlState('sneak', false)
+
     // Test freemotion
     if (stateMovements && stateMovements.allowFreeMotion && stateGoal && stateGoal.entity) {
       const target = stateGoal.entity
@@ -684,7 +686,7 @@ function inject (bot) {
 
         if (target.position.distanceSquared(bot.entity.position) > stateGoal.rangeSq) {
           bot.setControlState('forward', true)
-          if (stateMovements.sneak) { bot.setControlState('sneak', true) }
+          if (stateMovements.sneak()) { bot.setControlState('sneak', true) }
         } else {
           clearControlStates()
         }
@@ -838,7 +840,7 @@ function inject (bot) {
           })
             .then(function() {
               // Dont release Sneak if the block placement was not successful
-              bot.setControlState('sneak', stateMovements.sneak)
+              bot.setControlState('sneak', stateMovements.sneak())
               if (bot.pathfinder.LOSWhenPlacingBlocks && placingBlock.returnPos) returningPos = placingBlock.returnPos.clone()
             })
             .catch(_ignoreError => {
@@ -1003,6 +1005,7 @@ function inject (bot) {
       }
       bot.setControlState('jump', true)
       bot.setControlState('sprint', false)
+      bot.setControlState('sneak', false)
     } else {
       (() => {
         const sprint = {
@@ -1010,6 +1013,12 @@ function inject (bot) {
           'optional': stateMovements.allowSprinting,
           'yes': true,
         }[nextPoint.sprint]
+
+        if (nextPoint.type === 'drop-down' || nextPoint.sprint === 'yes') {
+          bot.setControlState('sneak', false)
+        } else {
+          bot.setControlState('sneak', Boolean(bot.controlState.sneak || stateMovements.sneak()))
+        }
 
         switch (nextPoint.type) {
           case 'forward':
@@ -1096,8 +1105,6 @@ function inject (bot) {
         }
       })()
     }
-
-    if (stateMovements.sneak) { bot.setControlState('sneak', true) }
 
     // check for futility
     if (!lastPosition || bot.entity.position.clone().distanceSquared(lastPosition) >= 1) {
