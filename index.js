@@ -1049,6 +1049,22 @@ function inject (bot) {
               return
             }
 
+            if (!sprint && stateMovements.allowSprinting) {
+              if (physics.canStraightLine(path, !sprint)) {
+                goForward(bot.pathfinder.lookAtTarget)
+                bot.setControlState('jump', false)
+                bot.setControlState('sprint', !sprint)
+                return
+              }
+
+              if (physics.canJump(path, !sprint)) {
+                goForward(bot.pathfinder.lookAtTarget)
+                bot.setControlState('jump', true)
+                bot.setControlState('sprint', !sprint)
+                return
+              }
+            }
+
             break
           case 'diagonal-up':
           case 'jump-up':
@@ -1057,6 +1073,15 @@ function inject (bot) {
               bot.setControlState('jump', true)
               bot.setControlState('sprint', sprint)
               return
+            }
+
+            if (!sprint && stateMovements.allowSprinting) {
+              if (physics.canJump(path, !sprint)) {
+                goForward(bot.pathfinder.lookAtTarget)
+                bot.setControlState('jump', true)
+                bot.setControlState('sprint', !sprint)
+                return
+              }
             }
 
             break
@@ -1069,7 +1094,7 @@ function inject (bot) {
           goForward(bot.pathfinder.lookAtTarget)
           bot.setControlState('jump', false)
           bot.setControlState('sprint', true)
-          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'straight-sprint')
+          console.warn(`Fallback ${nextPoint.type} -> straight-sprint (${nextPoint.sprint} sprint)`)
           return
         }
 
@@ -1077,7 +1102,7 @@ function inject (bot) {
           goForward(bot.pathfinder.lookAtTarget)
           bot.setControlState('jump', true)
           bot.setControlState('sprint', true)
-          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'jump-sprint')
+          console.warn(`Fallback ${nextPoint.type} -> jump-sprint (${nextPoint.sprint} sprint)`)
           return
         }
 
@@ -1085,7 +1110,7 @@ function inject (bot) {
           goForward(bot.pathfinder.lookAtTarget)
           bot.setControlState('jump', false)
           bot.setControlState('sprint', false)
-          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'straight')
+          console.warn(`Fallback ${nextPoint.type} -> straight (${nextPoint.sprint} sprint)`)
           return
         }
 
@@ -1093,7 +1118,7 @@ function inject (bot) {
           goForward(bot.pathfinder.lookAtTarget)
           bot.setControlState('jump', true)
           bot.setControlState('sprint', false)
-          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'jump')
+          console.warn(`Fallback ${nextPoint.type} -> jump (${nextPoint.sprint} sprint)`)
           return
         }
 
@@ -1101,7 +1126,7 @@ function inject (bot) {
           goForward(bot.pathfinder.lookAtTarget)
           bot.setControlState('jump', false)
           bot.setControlState('sprint', false)
-          console.warn('fallback', nextPoint.type, nextPoint.sprint, 'default')
+          console.warn(`Fallback ${nextPoint.type} -> default (${nextPoint.sprint} sprint)`)
         }
       })()
     }
